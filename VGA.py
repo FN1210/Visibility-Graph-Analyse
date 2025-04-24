@@ -4,13 +4,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 import pandas as pd
-from joblib import Memory
-import hashlib
 
 st.title("RR Visibility Graph Analyzer")
-
-# Cache to improve performance
-memory = Memory(location=".cache", verbose=0)
 
 # Upload RR data
 uploaded_file = st.file_uploader("Upload RR data (CSV/TXT)", type=["csv", "txt"])
@@ -23,16 +18,16 @@ if uploaded_file is not None:
 
     ts = rr_data.values
 
-    @memory.cache
+    # Optimierte Sichtbarkeitsgraph-Funktion (keine extra Libs)
     def compute_visibility_graph(ts):
         G = nx.Graph()
         n = len(ts)
         for i in range(n):
             G.add_node(i, value=ts[i])
             for j in range(i+1, n):
-                visible = True
                 dy = ts[j] - ts[i]
                 dx = j - i
+                visible = True
                 for k in range(i+1, j):
                     if ts[k] > ts[i] + dy * ((k - i) / dx):
                         visible = False

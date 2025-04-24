@@ -18,25 +18,25 @@ if uploaded_file is not None:
 
     ts = rr_data.values
 
-    # Optimierte Sichtbarkeitsgraph-Funktion (keine extra Libs)
-    def compute_visibility_graph(ts):
-        G = nx.Graph()
+    # Optimierte und beschleunigte Sichtbarkeitsgraph-Funktion mit NumPy-Vektorisierung
+    def compute_visibility_graph_fast(ts):
         n = len(ts)
+        G = nx.Graph()
+        G.add_nodes_from(range(n))
         for i in range(n):
-            G.add_node(i, value=ts[i])
-            for j in range(i+1, n):
-                dy = ts[j] - ts[i]
-                dx = j - i
-                visible = True
-                for k in range(i+1, j):
-                    if ts[k] > ts[i] + dy * ((k - i) / dx):
-                        visible = False
-                        break
-                if visible:
+            for j in range(i + 1, n):
+                slope = (ts[j] - ts[i]) / (j - i)
+                intercept = ts[i]
+                k_range = np.arange(i + 1, j)
+                if k_range.size == 0:
+                    G.add_edge(i, j)
+                    continue
+                y_interp = intercept + slope * (k_range - i)
+                if np.all(ts[k_range] < y_interp):
                     G.add_edge(i, j)
         return G
 
-    G = compute_visibility_graph(ts)
+    G = compute_visibility_graph_fast(ts)
 
     # (b) Zeitreihe
     fig1, ax1 = plt.subplots()
@@ -48,9 +48,9 @@ if uploaded_file is not None:
 
     # (a) Sichtbarkeitsgraph
     fig2, ax2 = plt.subplots()
-    pos = nx.spring_layout(G, seed=42, k=0.1, iterations=20)
+    pos = nx.spring_layout(G, seed=42, k=0.15, iterations=10)
     degrees = [G.degree(n) for n in G.nodes()]
-    nx.draw(G, pos, node_size=20, node_color=degrees, cmap=plt.cm.viridis, ax=ax2, with_labels=False)
+    nx.draw(G, pos, node_size=15, node_color=degrees, cmap=plt.cm.viridis, ax=ax2, with_labels=False)
     ax2.set_title("(a) Visibility Graph")
     st.pyplot(fig2)
 

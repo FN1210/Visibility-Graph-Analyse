@@ -18,7 +18,11 @@ if uploaded_file is not None:
 
     ts = rr_data.values
 
-    # Optimierte und beschleunigte Sichtbarkeitsgraph-Funktion mit NumPy-Vektorisierung
+    # Sampling option for performance
+    st.sidebar.markdown("### Sampling Options")
+    max_len = st.sidebar.slider("Max length of time series", min_value=100, max_value=min(1000, len(ts)), value=min(500, len(ts)), step=50)
+    ts = ts[:max_len]
+
     def compute_visibility_graph_fast(ts):
         n = len(ts)
         G = nx.Graph()
@@ -48,9 +52,9 @@ if uploaded_file is not None:
 
     # (a) Sichtbarkeitsgraph
     fig2, ax2 = plt.subplots()
-    pos = nx.spring_layout(G, seed=42, k=0.15, iterations=10)
+    pos = nx.spring_layout(G, seed=42, k=0.15, iterations=5)
     degrees = [G.degree(n) for n in G.nodes()]
-    nx.draw(G, pos, node_size=15, node_color=degrees, cmap=plt.cm.viridis, ax=ax2, with_labels=False)
+    nx.draw(G, pos, node_size=10, node_color=degrees, cmap=plt.cm.viridis, ax=ax2, with_labels=False)
     ax2.set_title("(a) Visibility Graph")
     st.pyplot(fig2)
 

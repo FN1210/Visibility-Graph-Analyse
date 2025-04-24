@@ -2,62 +2,70 @@ import streamlit as st
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from tqdm import tqdm
+from scipy.stats import linregress
+import pandas as pd
 
-# ---------- App Config ----------
-st.set_page_config(page_title="Visibility Graph Analyse", layout="centered")
-st.title("🌐 Visibility Graph Analyse")
+st.title("RR Visibility Graph Analyzer")
 
-# ---------- Datei-Upload ----------
-uploaded_file = st.file_uploader("📤 Lade deine RR-Intervall-Datei (.txt) hoch", type=["txt"])
+# Upload RR data
+uploaded_file = st.file_uploader("Upload RR data (CSV/TXT)", type=["csv", "txt"])
 
-# ---------- Visibility Graph Funktionen ----------
-def visibility_graph_fast(ts):
-    G = nx.Graph()
-    N = len(ts)
-    G.add_nodes_from(range(N))
-    for i in range(N):
-        t_i, y_i = i, ts[i]
-        max_slope = -np.inf
-        for j in range(i+1, N):
-            t_j, y_j = j, ts[j]
-            slope = (y_j - y_i) / (t_j - t_i)
-            visible = True
-            for k in range(i+1, j):
-                t_k, y_k = k, ts[k]
-                y_interp = y_i + slope * (t_k - t_i)
-                if y_k >= y_interp:
-                    visible = False
-                    break
-            if visible:
-                G.add_edge(i, j)
-    return G
-
-def plot_visibility_graph(G):
-    degrees = [deg for _, deg in G.degree()]
-    if len(degrees) > 0:
-        plt.figure(figsize=(8, 4), facecolor='#000')
-        plt.hist(degrees, bins=range(min(degrees), max(degrees)+1), alpha=0.8, color='#6DCFF6', edgecolor='white')
-        plt.title("Degree Distribution of Visibility Graph", color='white')
-        plt.xlabel("Degree", color='white')
-        plt.ylabel("Frequency", color='white')
-        plt.grid(True, color='#555', linestyle='--', linewidth=0.5)
-        plt.gca().tick_params(colors='white')
-        plt.gca().spines['bottom'].set_color('white')
-        plt.gca().spines['left'].set_color('white')
-        st.pyplot(plt.gcf())
-        plt.close()
-    else:
-        st.warning("Nicht genug Knoten im Visibility Graph für eine Verteilung.")
-
-# ---------- Hauptlogik ----------
 if uploaded_file is not None:
-    rr_lines = uploaded_file.read().decode("utf-8").splitlines()
-    rr_intervals = np.array([float(line.strip()) for line in rr_lines if line.strip()])
+    try:
+        rr_data = pd.read_csv(uploaded_file, header=None).squeeze("columns")
+    except Exception:
+        rr_data = pd.read_csv(uploaded_file, delim_whitespace=True, header=None).squeeze("columns")
 
-    with st.spinner("Erzeuge Visibility Graph..."):
-        G = visibility_graph_fast(rr_intervals[:1000])  # Limitierung für Performance
+    ts = rr_data.values
 
-    plot_visibility_graph(G)
+    def visibility_graph(ts):
+        G = nx.Graph()
+        n = len(ts)
+        for i in range(n):
+            G.add_node(i, value=ts[i])
+            for j in range(i+1, n):
+                visible = True
+                for k in range(i+1, j):
+                    if ts[k] > ts[i] + (ts[j] - ts[i]) * ((k - i) / (j - i)):
+                        visible = False
+                        break
+                if visible:
+                    G.add_edge(i, j)
+        return G
+
+    G = visibility_graph(ts)
+
+    # (b) Zeitreihe
+    fig1, ax1 = plt.subplots()
+    ax1.plot(ts, color='black')
+    ax1.set_title("(b) RR Time Series")
+    ax1.set_xlabel("Samples")
+    ax1.set_ylabel("Magnitude")
+    st.pyplot(fig1)
+
+    # (a) Sichtbarkeitsgraph
+    fig2, ax2 = plt.subplots()
+    pos = nx.spring_layout(G, seed=42)
+    degrees = [G.degree(n) for n in G.nodes()]
+    nx.draw(G, pos, node_size=30, node_color=degrees, cmap=plt.cm.viridis, ax=ax2)
+    ax2.set_title("(a) Visibility Graph")
+    st.pyplot(fig2)
+
+    # (c) k vs M Plot mit Linear Fit
+    k = np.array([G.degree(n) for n in G.nodes()])
+    M = np.array([ts[n] for n in G.nodes()])
+    slope, intercept, r_value, p_value, std_err = linregress(M, k)
+
+    fig3, ax3 = plt.subplots()
+    ax3.scatter(M, k, color='black', s=10, label='Data')
+    ax3.plot(M, intercept + slope*M, color='red', label='Linear fit')
+    ax3.set_xlabel("Magnitude (M)")
+    ax3.set_ylabel("Connectivity degree (k)")
+    ax3.set_title("(c) k vs M with Linear Fit")
+    ax3.legend()
+    st.pyplot(fig3)
+
+    st.markdown(f"**Average Degree:** {np.mean(k):.2f}")
+    st.markdown(f"**Average Path Length:** {nx.average_shortest_path_length(G):.2f}" if nx.is_connected(G) else "Graph is not connected.")
 else:
-    st.info("Bitte lade eine .txt-Datei mit RR-Intervallen hoch (eine Zahl pro Zeile).")
+    st.info("Please upload a file to begin.")

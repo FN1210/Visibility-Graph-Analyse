@@ -5,3 +5,5 @@ matplotlib
 plotly
 nolds
 tqdm
+scipy
+pandas

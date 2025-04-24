@@ -1,10 +1,6 @@
 streamlit
 numpy
+pandas
 networkx
 matplotlib
-plotly
-nolds
-tqdm
 scipy
-pandas
-joblib

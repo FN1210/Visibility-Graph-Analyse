@@ -7,3 +7,5 @@ nolds
 tqdm
 scipy
 pandas
+joblib
+hashlib

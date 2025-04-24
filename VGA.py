@@ -4,8 +4,13 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 import pandas as pd
+from joblib import Memory
+import hashlib
 
 st.title("RR Visibility Graph Analyzer")
+
+# Cache to improve performance
+memory = Memory(location=".cache", verbose=0)
 
 # Upload RR data
 uploaded_file = st.file_uploader("Upload RR data (CSV/TXT)", type=["csv", "txt"])
@@ -18,22 +23,25 @@ if uploaded_file is not None:
 
     ts = rr_data.values
 
-    def visibility_graph(ts):
+    @memory.cache
+    def compute_visibility_graph(ts):
         G = nx.Graph()
         n = len(ts)
         for i in range(n):
             G.add_node(i, value=ts[i])
             for j in range(i+1, n):
                 visible = True
+                dy = ts[j] - ts[i]
+                dx = j - i
                 for k in range(i+1, j):
-                    if ts[k] > ts[i] + (ts[j] - ts[i]) * ((k - i) / (j - i)):
+                    if ts[k] > ts[i] + dy * ((k - i) / dx):
                         visible = False
                         break
                 if visible:
                     G.add_edge(i, j)
         return G
 
-    G = visibility_graph(ts)
+    G = compute_visibility_graph(ts)
 
     # (b) Zeitreihe
     fig1, ax1 = plt.subplots()
@@ -45,9 +53,9 @@ if uploaded_file is not None:
 
     # (a) Sichtbarkeitsgraph
     fig2, ax2 = plt.subplots()
-    pos = nx.spring_layout(G, seed=42)
+    pos = nx.spring_layout(G, seed=42, k=0.1, iterations=20)
     degrees = [G.degree(n) for n in G.nodes()]
-    nx.draw(G, pos, node_size=30, node_color=degrees, cmap=plt.cm.viridis, ax=ax2)
+    nx.draw(G, pos, node_size=20, node_color=degrees, cmap=plt.cm.viridis, ax=ax2, with_labels=False)
     ax2.set_title("(a) Visibility Graph")
     st.pyplot(fig2)
 
